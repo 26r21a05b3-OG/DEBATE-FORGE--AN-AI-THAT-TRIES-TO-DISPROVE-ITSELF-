@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Debate Forge</title>
+<meta name="description" content="A classifier-routed debate engine — Proposer, Skeptic, Verifier, Judge — for cross-examining a question before answering it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #15120f;
+    --surface: #1e1915;
+    --surface-2: #27211b;
+    --fg: #ece4d6;
+    --muted: #a79a86;
+    --rule: #3a322a;
+    --accent: #d98a3d;
+    --accent-fg: #1a1410;
+    --proposer: #6f9bd8;
+    --skeptic: #d9685f;
+    --verifier: #5fab7e;
+    --judge: #d9b44a;
+    --danger: #d9685f;
+    color-scheme: dark;
+
+    --font-display: 'Fraunces', Georgia, 'Iowan Old Style', serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    line-height: 1.55;
+  }
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 64px;
+  }
+  .masthead { margin-bottom: 28px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(32px, 7vw, 44px);
+    margin: 10px 0 10px;
+    letter-spacing: -0.01em;
+  }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 17px; margin: 0; }
+  .tagline { color: var(--muted); font-size: 15.5px; max-width: 48ch; margin: 0; }
+
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 18px; margin-bottom: 20px; min-width: 0; }
+
+  .input-panel label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  textarea#question {
+    width: 100%;
+    min-width: 0;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--rule);
+    border-radius: 9px;
+    padding: 12px 13px;
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    line-height: 1.5;
+    resize: vertical;
+    min-height: 68px;
+  }
+  textarea#question:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  button {
+    font-family: var(--font-body);
+    font-size: 14.5px;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 10px 18px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .btn-primary { background: var(--accent); color: var(--accent-fg); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn-ghost { background: transparent; color: var(--muted); border-color: var(--rule); }
+  .btn-ghost:hover:not(:disabled) { color: var(--fg); border-color: var(--muted); }
+  .btn-small { font-size: 12.5px; padding: 6px 12px; background: transparent; color: var(--muted); border-color: var(--rule); }
+  .btn-small:hover:not(:disabled) { color: var(--fg); border-color: var(--muted); }
+  .link-btn { background: none; border: none; padding: 0; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 2px; }
+  .link-btn:hover { color: var(--fg); }
+  .status-note { font-size: 13px; color: var(--muted); margin: 12px 0 0; }
+  .status-note.error { color: var(--danger); }
+
+  .fallback-panel textarea {
+    width: 100%;
+    min-width: 0;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--rule);
+    border-radius: 9px;
+    padding: 12px 13px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.55;
+    min-height: 200px;
+    resize: vertical;
+  }
+  .fallback-panel p { margin: 0 0 12px; color: var(--muted); font-size: 13.5px; }
+
+  @keyframes pulse { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.001ms !important; } }
+
+  /* --- routing / classifier card --- */
+  .routing-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .confidence-value { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+  .gauge-track { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+  .gauge-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.7s ease; }
+  .route-pills { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .route-pill {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em;
+    padding: 5px 11px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted);
+  }
+  .route-pill.active { border-color: var(--accent); color: var(--accent-fg); background: var(--accent); font-weight: 500; }
+
+  /* --- agent panels --- */
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .agent-card {
+    background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--role-color, var(--rule));
+    border-radius: 12px; padding: 15px 16px; min-width: 0;
+  }
+  .agent-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+  .agent-name { font-family: var(--font-display); font-weight: 600; font-size: 14.5px; color: var(--role-color, var(--fg)); }
+  .agent-status { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .agent-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rule); flex-shrink: 0; }
+  .agent-status.waiting .dot { background: var(--rule); }
+  .agent-status.active .dot { background: var(--role-color, var(--accent)); animation: pulse 1.1s ease-in-out infinite; }
+  .agent-status.done .dot { background: var(--verifier); }
+  .agent-text { font-size: 13px; color: var(--fg); min-height: 54px; white-space: pre-wrap; overflow-wrap: break-word; }
+  .agent-text .cursor { display: inline-block; width: 2px; height: 13px; background: var(--role-color, var(--accent)); margin-left: 1px; vertical-align: text-bottom; animation: blink 0.9s step-end infinite; }
+
+  /* --- judge / verdict card --- */
+  .judge-card { border-top: 3px solid var(--judge); }
+  .judge-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .decision-pill {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.03em;
+    padding: 5px 12px; border-radius: 999px; font-weight: 500; background: var(--surface-2); border: 1px solid var(--rule);
+  }
+  .decision-pill.approved { border-color: var(--verifier); color: var(--verifier); }
+  .decision-pill.review { border-color: var(--judge); color: var(--judge); }
+  .decision-pill.escalate { border-color: var(--skeptic); color: var(--skeptic); }
+  .consensus-row { display: flex; align-items: center; gap: 10px; font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); margin-bottom: 16px; }
+  .consensus-track { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .consensus-fill { height: 100%; width: 0%; background: var(--judge); transition: width 0.7s ease; }
+  .judge-text { font-size: 14.5px; min-width: 0; }
+  .judge-text .cursor { display: inline-block; width: 2px; height: 14px; background: var(--judge); margin-left: 1px; vertical-align: text-bottom; animation: blink 0.9s step-end infinite; }
+
+  /* --- audit trail --- */
+  .audit-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .audit-list { display: flex; flex-direction: column; gap: 8px; }
+  .audit-row { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 11px 13px; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .audit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--rule); }
+  .audit-dot.approved { background: var(--verifier); }
+  .audit-dot.review { background: var(--judge); }
+  .audit-dot.escalate { background: var(--skeptic); }
+  .audit-q { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .audit-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); display: flex; gap: 9px; flex-shrink: 0; white-space: nowrap; }
+  .audit-empty { color: var(--muted); font-size: 13px; padding: 18px; text-align: center; border: 1px dashed var(--rule); border-radius: 10px; }
+
+  @media (max-width: 420px) { h1 { font-size: 30px; } .audit-meta span:nth-child(3) { display: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="masthead">
+    <div class="eyebrow">Classifier-routed debate engine</div>
+    <h1>Debate Forge</h1>
+    <p class="tagline">Every question gets scored first. Confident ones pass straight through; uncertain ones go to a panel — Proposer, Skeptic, Verifier — before a Judge rules.</p>
+  </header>
+
+  <section class="card input-panel">
+    <label for="question">Your question or claim</label>
+    <textarea id="question" rows="3" placeholder="e.g. Should we switch our database from Postgres to a document store?"></textarea>
+    <div class="controls">
+      <button id="runBtn" class="btn-primary" type="button">Begin debate</button>
+      <button id="stopBtn" class="btn-ghost" type="button" hidden>Stop</button>
+      <button id="toggleFallbackBtn" class="link-btn" type="button">Run as a real debate in Claude instead →</button>
+    </div>
+    <p id="statusNote" class="status-note" hidden></p>
+  </section>
+
+  <section id="fallbackPanel" class="card fallback-panel" hidden>
+    <p>This page simulates the flow locally. To get a real, reasoned debate on your exact question, copy this prompt into Claude (or another assistant).</p>
+    <textarea id="fallbackPrompt" readonly></textarea>
+    <div class="controls">
+      <button id="copyFallbackBtn" class="btn-small" type="button">Copy prompt</button>
+    </div>
+  </section>
+
+  <section id="routingCard" class="card" hidden>
+    <div class="routing-head">
+      <h2>Classifier</h2>
+      <span id="confidenceValue" class="confidence-value">—</span>
+    </div>
+    <div class="gauge-track"><div id="gaugeFill" class="gauge-fill"></div></div>
+    <div class="route-pills">
+      <span id="pillFast" class="route-pill">Fast path · auto-approve</span>
+      <span id="pillDebate" class="route-pill">Full debate · 3 agents</span>
+    </div>
+  </section>
+
+  <section id="agentsGrid" class="agents-grid" hidden>
+    <div class="agent-card" style="--role-color: var(--proposer);">
+      <div class="agent-head">
+        <span class="agent-name">Proposer</span>
+        <span id="statusProposer" class="agent-status waiting"><span class="dot"></span>Waiting</span>
+      </div>
+      <div id="textProposer" class="agent-text"></div>
+    </div>
+    <div class="agent-card" style="--role-color: var(--skeptic);">
+      <div class="agent-head">
+        <span class="agent-name">Skeptic</span>
+        <span id="statusSkeptic" class="agent-status waiting"><span class="dot"></span>Waiting</span>
+      </div>
+      <div id="textSkeptic" class="agent-text"></div>
+    </div>
+    <div class="agent-card" style="--role-color: var(--verifier);">
+      <div class="agent-head">
+        <span class="agent-name">Verifier</span>
+        <span id="statusVerifier" class="agent-status waiting"><span class="dot"></span>Waiting</span>
+      </div>
+      <div id="textVerifier" class="agent-text"></div>
+    </div>
+  </section>
+
+  <section id="judgeCard" class="card judge-card" hidden>
+    <div class="judge-head">
+      <h2>Judge verdict</h2>
+      <span id="decisionPill" class="decision-pill">—</span>
+    </div>
+    <div class="consensus-row">
+      <span>Consensus</span>
+      <div class="consensus-track"><div id="consensusFill" class="consensus-fill"></div></div>
+      <span id="consensusValue">—</span>
+    </div>
+    <div id="judgeText" class="judge-text"></div>
+  </section>
+
+  <section class="audit-section">
+    <div class="audit-head">
+      <h2>Audit trail</h2>
+      <button id="clearAuditBtn" class="link-btn" type="button">Clear</button>
+    </div>
+    <div id="auditList" class="audit-list"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const questionEl = document.getElementById('question');
+  const runBtn = document.getElementById('runBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const statusNote = document.getElementById('statusNote');
+  const toggleFallbackBtn = document.getElementById('toggleFallbackBtn');
+  const fallbackPanel = document.getElementById('fallbackPanel');
+  const fallbackPrompt = document.getElementById('fallbackPrompt');
+  const copyFallbackBtn = document.getElementById('copyFallbackBtn');
+
+  const routingCard = document.getElementById('routingCard');
+  const confidenceValue = document.getElementById('confidenceValue');
+  const gaugeFill = document.getElementById('gaugeFill');
+  const pillFast = document.getElementById('pillFast');
+  const pillDebate = document.getElementById('pillDebate');
+
+  const agentsGrid = document.getElementById('agentsGrid');
+  const roles = ['Proposer', 'Skeptic', 'Verifier'];
+  const statusEls = { Proposer: document.getElementById('statusProposer'), Skeptic: document.getElementById('statusSkeptic'), Verifier: document.getElementById('statusVerifier') };
+  const textEls = { Proposer: document.getElementById('textProposer'), Skeptic: document.getElementById('textSkeptic'), Verifier: document.getElementById('textVerifier') };
+
+  const judgeCard = document.getElementById('judgeCard');
+  const decisionPill = document.getElementById('decisionPill');
+  const consensusFill = document.getElementById('consensusFill');
+  const consensusValue = document.getElementById('consensusValue');
+  const judgeText = document.getElementById('judgeText');
+
+  const auditList = document.getElementById('auditList');
+  const clearAuditBtn = document.getElementById('clearAuditBtn');
+
+  const STORAGE_KEY = 'debateforge_audit_v1';
+  let runCounter = 0;
+  let timers = [];
+  let backendCtl = null;
+
+  // ---------- audit trail ----------
+  function loadAudit() {
+    try { const v = JSON.parse(localStorage.getItem(STORAGE_KEY)); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function saveAudit(list) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, 50))); } catch (e) { /* storage unavailable */ }
+  }
+  let auditLog = loadAudit();
+
+  function decisionClass(d) { return d === 'Approved' ? 'approved' : d === 'Escalate' ? 'escalate' : 'review'; }
+
+  function renderAudit() {
+    auditList.innerHTML = '';
+    if (!auditLog.length) {
+      const empty = document.createElement('div');
+      empty.className = 'audit-empty';
+      empty.textContent = 'No runs yet — your debate history will show up here.';
+      auditList.appendChild(empty);
+      return;
+    }
+    auditLog.forEach((rec) => {
+      const row = document.createElement('div');
+      row.className = 'audit-row';
+      const dot = document.createElement('span');
+      dot.className = 'audit-dot ' + decisionClass(rec.decision);
+      const q = document.createElement('span');
+      q.className = 'audit-q';
+      q.textContent = rec.question;
+      const meta = document.createElement('span');
+      meta.className = 'audit-meta';
+      const path = document.createElement('span');
+      path.textContent = rec.path === 'fast' ? 'Fast path' : 'Full debate';
+      const rounds = document.createElement('span');
+      rounds.textContent = rec.rounds + (rec.rounds === 1 ? ' round' : ' rounds');
+      const time = document.createElement('span');
+      time.textContent = rec.time;
+      meta.appendChild(path); meta.appendChild(rounds); meta.appendChild(time);
+      row.appendChild(dot); row.appendChild(q); row.appendChild(meta);
+      auditList.appendChild(row);
+    });
+  }
+  renderAudit();
+
+  clearAuditBtn.addEventListener('click', () => {
+    auditLog = [];
+    saveAudit(auditLog);
+    renderAudit();
+  });
+
+  function logRun(question, path, decision, rounds) {
+    auditLog.unshift({
+      question: truncate(question, 72),
+      path: path,
+      decision: decision,
+      rounds: rounds,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+    saveAudit(auditLog);
+    renderAudit();
+  }
+
+  // ---------- helpers ----------
+  function truncate(s, n) { return s.length > n ? s.slice(0, n - 1) + '…' : s; }
+
+  function estimateConfidence(q) {
+    let score = 55;
+    const lower = q.toLowerCase();
+    ['should', 'could', 'might', 'maybe', 'better', 'versus', ' vs ', 'pros and cons', 'debate', 'controversial', 'best way', 'worth it', 'right choice', 'ethical', 'opinion'].forEach((w) => { if (lower.indexOf(w) !== -1) score -= 8; });
+    ['what is', 'when did', 'when was', 'how many', 'how much', 'capital of', 'define', 'who is', 'who was', 'what year', 'how far', 'how long'].forEach((w) => { if (lower.indexOf(w) !== -1) score += 15; });
+    const words = q.trim().split(/\s+/).filter(Boolean);
+    if (words.length > 22) score -= 10;
+    if (words.length < 8) score += 8;
+    if ((q.match(/\?/g) || []).length > 1) score -= 6;
+    if (/\b(and|or|but)\b/i.test(q)) score -= 4;
+    return Math.max(5, Math.min(95, Math.round(score)));
+  }
+
+  function decisionFromConsensus(c) { return c >= 65 ? 'Approved' : c >= 40 ? 'Needs Review' : 'Escalate'; }
+
+  const AGENT_COPY = {
+    Proposer: (q) => 'Starting position on "' + truncate(q, 64) + '": commit to the most defensible answer rather than hedge, and lay out the reasoning that gets there before any objection lands.',
+    Skeptic: () => 'Pushing back: where does that position assume something it hasn’t shown? Looking for the edge case the reasoning skips past, and the place confidence is standing in for an argument.',
+    Verifier: () => 'Checking what’s actually checkable here — any number, date, or claim that resolves to a fact gets flagged as confirmed or unverifiable. Nothing passes through unexamined.',
+  };
+
+  function judgeCopy(q, consensus, decision) {
+    const lead = decision === 'Approved' ? 'the Proposer’s position held up under scrutiny'
+      : decision === 'Escalate' ? 'the Skeptic’s objections landed hard enough to block this'
+      : 'the panel didn’t fully settle it';
+    const tail = decision === 'Approved'
+      ? 'Nothing in the Verifier’s pass or the Skeptic’s challenge was strong enough to overturn it.'
+      : 'Treat this as a starting point, not a final answer — the parts the Skeptic flagged need a real check.';
+    return 'Weighing the three rounds on "' + truncate(q, 56) + '": ' + lead + '. Panel consensus came out at ' + consensus + '%. ' + tail;
+  }
+
+  // ---------- typewriter ----------
+  function typeInto(el, text, speed, myRun, onDone) {
+    el.textContent = '';
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    el.appendChild(cursor);
+    let i = 0;
+    function step() {
+      if (myRun !== runCounter) return;
+      i++;
+      el.textContent = text.slice(0, i);
+      el.appendChild(cursor);
+      if (i < text.length) {
+        timers.push(setTimeout(step, speed));
+      } else {
+        cursor.remove();
+        if (onDone) onDone();
+      }
+    }
+    step();
+  }
+
+  function clearTimers() { timers.forEach((t) => clearTimeout(t)); timers = []; }
+
+  // ---------- UI state ----------
+  function resetUI() {
+    routingCard.hidden = true;
+    agentsGrid.hidden = true;
+    judgeCard.hidden = true;
+    fallbackPanel.hidden = true;
+    gaugeFill.style.width = '0%';
+    consensusFill.style.width = '0%';
+    pillFast.classList.remove('active');
+    pillDebate.classList.remove('active');
+    roles.forEach((r) => {
+      statusEls[r].className = 'agent-status waiting';
+      statusEls[r].innerHTML = '<span class="dot"></span>Waiting';
+      textEls[r].textContent = '';
+    });
+    setStatus('');
+  }
+
+  function setStatus(message, isError) {
+    statusNote.textContent = message || '';
+    statusNote.hidden = !message;
+    statusNote.classList.toggle('error', !!isError);
+  }
+
+  function setRunningUI(isRunning) {
+    runBtn.disabled = isRunning;
+    runBtn.textContent = isRunning ? 'Running…' : 'Begin debate';
+    stopBtn.hidden = !isRunning;
+  }
+
+  function setAgentStatus(role, state) {
+    const el = statusEls[role];
+    el.className = 'agent-status ' + state;
+    el.innerHTML = '<span class="dot"></span>' + (state === 'active' ? 'Arguing' : state === 'done' ? 'Done' : 'Waiting');
+  }
+
+  // ---------- fallback prompt panel ----------
+  function buildFallbackPrompt(question) {
+    return 'I want you to settle this by argument, not by guessing. Run it as a four-way debate instead of just answering straight off.\n\n'
+      + 'First, play the Proposer. Read my question and put forward your best answer, along with the reasoning that gets you there. Don’t hedge yet — commit to a real position.\n\n'
+      + 'Then switch to the Skeptic. Forget you just wrote that answer and go after it like you’re trying to break it. Look for the weakest assumption, the edge case it doesn’t handle, the place where the logic quietly skips a step. If there’s a counterexample, find it.\n\n'
+      + 'Next, be the Verifier. Where the Proposer or the Skeptic made a factual claim, a calculation, or something that can actually be checked, check it — work through the math, trace the logic, or flag what would need a source if this were going out the door for real. If something can’t be verified with what we have, say that plainly instead of papering over it.\n\n'
+      + 'Finally, step in as the Judge. Weigh what came out of the first three rounds — where the Skeptic’s objections actually landed versus where the Proposer held up — and give a final verdict: the answer, your confidence in it, and the one or two things that would change your mind if they turned out to be true.\n\n'
+      + 'Once all four rounds are done, write ONE final answer that folds everything together into a single, clear response — no role labels, no transcript, just the answer, the way you’d normally reply.\n\n'
+      + 'If the question is too simple for all this (a fact lookup, basic arithmetic), skip the debate and just answer it directly.\n\n'
+      + 'Here’s the question: ' + question;
+  }
+
+  toggleFallbackBtn.addEventListener('click', () => {
+    const question = questionEl.value.trim() || '[your question here]';
+    fallbackPrompt.value = buildFallbackPrompt(question);
+    fallbackPanel.hidden = !fallbackPanel.hidden;
+  });
+
+  copyFallbackBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(fallbackPrompt.value);
+      copyFallbackBtn.textContent = 'Copied';
+      setTimeout(() => { copyFallbackBtn.textContent = 'Copy prompt'; }, 1800);
+    } catch (err) {
+      fallbackPrompt.focus();
+      fallbackPrompt.select();
+    }
+  });
+
+  // ---------- demo engine (runs locally, no backend) ----------
+  function runDemo(question, myRun) {
+    const confidence = estimateConfidence(question);
+    const route = confidence >= 70 ? 'fast' : 'debate';
+
+    routingCard.hidden = false;
+    confidenceValue.textContent = confidence + '% confident';
+    requestAnimationFrame(() => { if (myRun === runCounter) gaugeFill.style.width = confidence + '%'; });
+    if (route === 'fast') pillFast.classList.add('active'); else pillDebate.classList.add('active');
+
+    if (route === 'fast') {
+      timers.push(setTimeout(() => {
+        if (myRun !== runCounter) return;
+        judgeCard.hidden = false;
+        decisionPill.textContent = 'Approved';
+        decisionPill.className = 'decision-pill approved';
+        consensusValue.textContent = confidence + '%';
+        requestAnimationFrame(() => { if (myRun === runCounter) consensusFill.style.width = confidence + '%'; });
+        typeInto(judgeText, 'Confidence was high enough to skip the panel — "' + truncate(question, 60) + '" was auto-approved without a full debate.', 14, myRun, () => {
+          logRun(question, 'fast', 'Approved', 0);
+          setRunningUI(false);
+        });
+      }, 500));
+      return;
+    }
+
+    // full debate path
+    agentsGrid.hidden = false;
+    let delay = 400;
+    const order = ['Proposer', 'Skeptic', 'Verifier'];
+    order.forEach((role, idx) => {
+      timers.push(setTimeout(() => {
+        if (myRun !== runCounter) return;
+        setAgentStatus(role, 'active');
+        typeInto(textEls[role], AGENT_COPY[role](question), 13, myRun, () => {
+          setAgentStatus(role, 'done');
+          if (idx === order.length - 1) {
+            timers.push(setTimeout(() => {
+              if (myRun !== runCounter) return;
+              const consensus = Math.max(10, Math.min(95, confidence - 8 + (idx * 3)));
+              const decision = decisionFromConsensus(consensus);
+              judgeCard.hidden = false;
+              decisionPill.textContent = decision;
+              decisionPill.className = 'decision-pill ' + decisionClass(decision);
+              consensusValue.textContent = consensus + '%';
+              requestAnimationFrame(() => { if (myRun === runCounter) consensusFill.style.width = consensus + '%'; });
+              typeInto(judgeText, judgeCopy(question, consensus, decision), 12, myRun, () => {
+                logRun(question, 'debate', decision, 3);
+                setRunningUI(false);
+              });
+            }, 450));
+          }
+        });
+      }, delay));
+      delay += 1500 + role.length * 18;
+    });
+  }
+
+  // ---------- optional real backend, same event contract as before ----------
+  function tryBackend(question, myRun) {
+    return new Promise((resolve) => {
+      backendCtl = new AbortController();
+      const timeout = setTimeout(() => backendCtl.abort(), 3000);
+
+      fetch('/api/debate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question }),
+        signal: backendCtl.signal,
+      }).then(async (response) => {
+        clearTimeout(timeout);
+        if (myRun !== runCounter) return resolve('aborted');
+        if (!response.ok || !response.body) return resolve('unavailable');
+
+        routingCard.hidden = true;
+        agentsGrid.hidden = false;
+        judgeCard.hidden = true;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let rounds = [];
+        let finalAnswer = '';
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (myRun !== runCounter) return resolve('aborted');
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop();
+          for (const part of parts) {
+            if (!part.trim()) continue;
+            let event = 'message', dataStr = '';
+            for (const line of part.split('\n')) {
+              if (line.startsWith('event:')) event = line.slice(6).trim();
+              else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
+            }
+            if (!dataStr) continue;
+            let payload;
+            try { payload = JSON.parse(dataStr); } catch (e) { continue; }
+
+            if (event === 'done') {
+              finalAnswer = payload.answer || '';
+              rounds = payload.rounds || [];
+              rounds.forEach((rec) => {
+                if (textEls[rec.label]) { textEls[rec.label].textContent = rec.text; setAgentStatus(rec.label, 'done'); }
+              });
+              judgeCard.hidden = false;
+              decisionPill.textContent = 'Approved';
+              decisionPill.className = 'decision-pill approved';
+              consensusValue.textContent = '—';
+              judgeText.textContent = finalAnswer;
+              logRun(question, 'debate', 'Approved', rounds.length);
+            } else if (event === 'error') {
+              setStatus(payload.message || 'Backend returned an error.', true);
+            }
+          }
+        }
+        resolve('handled');
+      }).catch(() => { clearTimeout(timeout); resolve('unavailable'); });
+    });
+  }
+
+  // ---------- orchestration ----------
+  async function begin() {
+    const question = questionEl.value.trim();
+    if (!question) { questionEl.focus(); return; }
+
+    const myRun = ++runCounter;
+    resetUI();
+    setRunningUI(true);
+    stopBtn.onclick = () => {
+      if (backendCtl) backendCtl.abort();
+      runCounter++;
+      clearTimers();
+      setStatus('Stopped.');
+      setRunningUI(false);
+    };
+
+    const backendResult = await tryBackend(question, myRun);
+    if (myRun !== runCounter) return;
+    if (backendResult === 'handled') { setRunningUI(false); return; }
+    if (backendResult === 'aborted') return;
+
+    setStatus('No backend connected — running the local demo.');
+    runDemo(question, myRun);
+  }
+
+  runBtn.addEventListener('click', begin);
+  questionEl.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') begin(); });
+})();
+</script>
+</body>
+</html>
